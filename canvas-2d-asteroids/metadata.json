@@ -1,0 +1,56 @@
+{
+  "slug": "canvas-2d-asteroids",
+  "title": "Canvas 2d Asteroids",
+  "topic": "canvas-2d-asteroids",
+  "created": "2026-09-02T20:56:19Z",
+  "status": "unverified",
+  "tags": [
+    "javascript",
+    "canvas",
+    "web",
+    "game"
+  ],
+  "parts": [
+    "part-01.md",
+    "part-02.md",
+    "part-03.md",
+    "part-04.md"
+  ],
+  "tools": [
+    {
+      "name": "node",
+      "version": "22.23.2"
+    },
+    {
+      "name": "python",
+      "version": "3.12.3"
+    }
+  ],
+  "sources": [
+    "https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Basic_usage",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Drawing_shapes",
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame",
+    "https://html.spec.whatwg.org/multipage/canvas.html",
+    "https://jakearchibald.com/2017/es-modules-in-browsers/",
+    "https://barker.codes/blog/javascript-modules-and-the-file-uri-scheme/",
+    "https://en.wikipedia.org/wiki/Asteroids_(video_game)",
+    "https://www.museumofplay.org/games/asteroids/",
+    "https://developer.mozilla.org/en-US/docs/Web/API/DOMHighResTimeStamp",
+    "https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/rotate",
+    "https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent",
+    "https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code",
+    "https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/arc",
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/font",
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/atan2",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse",
+    "https://www.arcade-history.com/game/126/"
+  ],
+  "voice": "plainspoken",
+  "model": "qwen3.8-27b-Q6"
+}

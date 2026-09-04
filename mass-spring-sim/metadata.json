@@ -1,0 +1,70 @@
+{
+  "slug": "mass-spring-sim",
+  "title": "Mass Spring Sim",
+  "topic": "mass-spring-sim",
+  "created": "2026-09-04T14:57:51Z",
+  "status": "unverified",
+  "tags": [
+    "physics",
+    "simulation",
+    "canvas",
+    "javascript"
+  ],
+  "parts": [
+    "part-01.md",
+    "part-02.md",
+    "part-03.md",
+    "part-04.md"
+  ],
+  "tools": [
+    {
+      "name": "node",
+      "version": "22.23.2"
+    },
+    {
+      "name": "python",
+      "version": "3.12.3"
+    },
+    {
+      "name": "three",
+      "version": "0.185.1"
+    }
+  ],
+  "sources": [
+    "https://en.wikipedia.org/wiki/Hooke%27s_law",
+    "https://en.wikipedia.org/wiki/Simple_harmonic_motion",
+    "https://en.wikipedia.org/wiki/Damped_harmonic_oscillator",
+    "https://en.wikipedia.org/wiki/Euler_method",
+    "https://en.wikipedia.org/wiki/Semi-implicit_Euler_method",
+    "https://en.wikipedia.org/wiki/Symplectic_integrator",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineWidth",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineJoin",
+    "https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText",
+    "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules",
+    "https://jakearchibald.com/2017/es-modules-in-browsers/",
+    "https://gafferonggames.com/post/fix_your_timestep/",
+    "https://en.wikipedia.org/wiki/Cloth_simulation",
+    "http://www.mirkosattler.de/publications/2002_tutorial_eg.pdf",
+    "https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect",
+    "https://developer.mozilla.org/en-US/docs/Web/Canvas_API/Tutorial/Transformations",
+    "https://threejs.org/manual/en/installation.html",
+    "https://threejs.org/manual/en/fundamentals.html",
+    "https://threejs.org/docs/pages/WebGLRenderer.html",
+    "https://threejs.org/docs/pages/PerspectiveCamera.html",
+    "https://threejs.org/docs/pages/Vector3.html",
+    "https://threejs.org/docs/pages/LineSegments.html",
+    "https://threejs.org/docs/pages/Points.html",
+    "https://threejs.org/docs/pages/PointsMaterial.html",
+    "https://threejs.org/docs/pages/BufferAttribute.html",
+    "https://threejs.org/docs/pages/Raycaster.html",
+    "https://threejs.org/docs/pages/Plane.html",
+    "https://threejs.org/docs/pages/GridHelper.html",
+    "https://en.wikipedia.org/wiki/Center_of_mass",
+    "http://www.cs.toronto.edu/~jacobson/seminar/mueller-et-al-2007.pdf",
+    "http://www.nealen.net/papers/pbdm.pdf"
+  ],
+  "voice": "plainspoken",
+  "model": "qwen3.8-27b-Q6"
+}

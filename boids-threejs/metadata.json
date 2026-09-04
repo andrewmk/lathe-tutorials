@@ -1,0 +1,41 @@
+{
+  "slug": "boids-threejs",
+  "title": "Boids Threejs",
+  "topic": "boids-threejs",
+  "created": "2026-09-02T14:47:37Z",
+  "status": "unverified",
+  "tags": [
+    "javascript",
+    "threejs",
+    "webgl",
+    "simulation",
+    "boids"
+  ],
+  "parts": [
+    "part-01.md",
+    "part-02.md"
+  ],
+  "tools": [
+    {
+      "name": "three.js",
+      "version": "0.185.1"
+    }
+  ],
+  "sources": [
+    "http://www.red3d.com/cwr/boids/",
+    "https://natureofcode.com/autonomous-agents/",
+    "https://threejs.org/manual/en/installation.html",
+    "https://threejs.org/manual/en/fundamentals.html",
+    "https://threejs.org/docs/pages/Vector3.html",
+    "https://threejs.org/docs/pages/InstancedMesh.html",
+    "https://threejs.org/docs/pages/Quaternion.html",
+    "https://threejs.org/docs/pages/ConeGeometry.html",
+    "https://threejs.org/docs/pages/WebGLRenderer.html",
+    "https://threejs.org/docs/pages/Object3D.html",
+    "http://www.red3d.com/cwr/nobump/nobump.html",
+    "http://www.red3d.com/cwr/steer/gdc99/",
+    "https://threejs.org/docs/pages/CylinderGeometry.html"
+  ],
+  "voice": "plainspoken",
+  "model": "qwen3.8-27b-Q6"
+}
