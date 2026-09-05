@@ -211,15 +211,15 @@ You now have a document with a table of contents, citations, Track Changes, and 
 
 ## Exercises
 
-1. Create a new document with five sections (Heading 1) and three subsections per section (Heading 2). Insert a table of contents, then customize it: remove page numbers, change the tab leader to dashes, and show only Heading 1 and Heading 2 levels.
+- [ ] Create a new document with five sections (Heading 1) and three subsections per section (Heading 2). Insert a table of contents, then customize it: remove page numbers, change the tab leader to dashes, and show only Heading 1 and Heading 2 levels.
 
-2. Add three citations to your document using different source types (book, website, journal). Generate a works cited list, then add a fourth source and update the bibliography. Verify that the list is alphabetized and formatted correctly.
+- [ ] Add three citations to your document using different source types (book, website, journal). Generate a works cited list, then add a fourth source and update the bibliography. Verify that the list is alphabetized and formatted correctly.
 
-3. Turn on Track Changes and make ten edits to your document (five insertions, five deletions). Switch to **No Markup** view, then switch back to **All Markup**. Verify that all changes are visible. Accept three changes and reject three changes.
+- [ ] Turn on Track Changes and make ten edits to your document (five insertions, five deletions). Switch to **No Markup** view, then switch back to **All Markup**. Verify that all changes are visible. Accept three changes and reject three changes.
 
-4. Create two copies of your document. Edit one copy (add text, change formatting). Use **Review > Compare** to compare the two versions. Examine the comparison document and identify all the changes.
+- [ ] Create two copies of your document. Edit one copy (add text, change formatting). Use **Review > Compare** to compare the two versions. Examine the comparison document and identify all the changes.
 
-5. Open the Navigation Pane. Drag a Heading 2 subsection to a different parent Heading 1. Verify that the content and any sub-subsections move with it. This demonstrates the Navigation Pane's drag-and-drop reordering.
+- [ ] Open the Navigation Pane. Drag a Heading 2 subsection to a different parent Heading 1. Verify that the content and any sub-subsections move with it. This demonstrates the Navigation Pane's drag-and-drop reordering.
 
 ## Sources
 

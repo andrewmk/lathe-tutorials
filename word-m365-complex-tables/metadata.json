@@ -1,0 +1,42 @@
+{
+  "slug": "word-m365-complex-tables",
+  "title": "Word M365 Complex Tables",
+  "topic": "word-m365-complex-tables",
+  "created": "2026-06-11T17:19:58Z",
+  "status": "unverified",
+  "tags": [
+    "word",
+    "microsoft-365",
+    "office",
+    "tables"
+  ],
+  "parts": [
+    "part-01.md",
+    "part-02.md",
+    "part-03.md"
+  ],
+  "tools": [
+    {
+      "name": "word",
+      "version": "microsoft-365"
+    }
+  ],
+  "sources": [
+    "https://support.microsoft.com/en-us/office/set-or-change-table-properties-3237de89-b287-4379-8e0c-86d94873b2e0",
+    "https://support.microsoft.com/en-us/office/merge-or-split-cells-in-a-table-8b458deb-0fc5-4c8d-8d94-2d4da98193f8",
+    "https://support.microsoft.com/en-us/office/use-a-formula-in-a-word-table-cbd0596e-ea8a-485e-a35d-b2cb2c4f3e27",
+    "https://support.microsoft.com/en-us/office/repeat-table-header-on-subsequent-pages-2ff677e0-3150-464a-a283-fa52794b4b41",
+    "https://support.microsoft.com/en-gb/office/split-a-table-in-word-d231a898-6983-4ef8-acb0-797c7f2b0c45",
+    "https://support.microsoft.com/en-us/office/sum-a-column-or-row-of-numbers-in-a-table-2e373a5f-2d8a-478a-9b85-275c8668bebb",
+    "https://learn.microsoft.com/en-us/office/vba/api/word.cell.formula",
+    "https://www.howtogeek.com/948/nesting-a-table-inside-a-table-in-word-2007/",
+    "https://www.avantixlearning.ca/microsoft-word/how-to-format-microsoft-word-tables-using-table-styles/",
+    "https://www.avantixlearning.ca/microsoft-word/how-to-center-text-vertically-in-a-word-table-and-fix-common-issues/",
+    "https://support.microsoft.com/en-us/office/sort-the-contents-of-a-table-f8392477-4613-49cd-aba6-7c2e48f1d91f",
+    "https://superuser.com/questions/571051/reference-to-a-cell-in-an-other-table-in-a-word-document-from-a-field",
+    "https://www.makeuseof.com/how-to-perform-calculations-in-microsoft-word/",
+    "https://support.microsoft.com/en-us/office/update-fields-7339a049-cb0d-4d5a-8679-97c20c643d4e",
+    "https://office-watch.com/2024/sorting-in-word/",
+    "https://community.spiceworks.com/t/is-there-any-way-to-protect-formulas-in-a-word-doc-table/885226"
+  ]
+}

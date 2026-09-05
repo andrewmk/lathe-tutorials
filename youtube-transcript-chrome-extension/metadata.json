@@ -1,0 +1,39 @@
+{
+  "slug": "youtube-transcript-chrome-extension",
+  "title": "Youtube Transcript Chrome Extension",
+  "topic": "youtube-transcript-chrome-extension",
+  "created": "2026-06-11T16:52:09Z",
+  "status": "unverified",
+  "tags": [
+    "chrome-extension",
+    "javascript",
+    "youtube",
+    "web"
+  ],
+  "parts": [
+    "part-01.md",
+    "part-02.md",
+    "part-03.md",
+    "part-04.md"
+  ],
+  "tools": [
+    {
+      "name": "chrome",
+      "version": "88+"
+    }
+  ],
+  "sources": [
+    "https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts",
+    "https://developer.chrome.com/docs/extensions/develop/concepts/network-requests",
+    "https://github.com/tombulled/innertube/blob/main/innertube/config.py",
+    "https://github.com/nadimtuhin/ytranscript/blob/main/HOW_IT_WORKS.md",
+    "https://github.com/la5u/right-side-comments/blob/main/content.js",
+    "https://developer.chrome.com/docs/extensions/reference/storage",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Clipboard",
+    "https://www.media.mit.edu/pia/Research/deepview/srtool/srt_subtitles.html",
+    "https://developer.chrome.com/docs/extensions/reference/commands/",
+    "https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL",
+    "https://developer.chrome.com/docs/extensions/reference/action/",
+    "https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/playbackRate"
+  ]
+}

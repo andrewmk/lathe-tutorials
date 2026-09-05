@@ -1,0 +1,48 @@
+{
+  "slug": "word-for-windows-m365",
+  "title": "Word For Windows M365",
+  "topic": "word-for-windows-m365",
+  "created": "2026-06-11T17:19:18Z",
+  "status": "unverified",
+  "tags": [
+    "word",
+    "microsoft-365",
+    "office",
+    "windows",
+    "productivity"
+  ],
+  "parts": [
+    "part-01.md",
+    "part-02.md",
+    "part-03.md"
+  ],
+  "tools": [
+    {
+      "name": "word",
+      "version": "2605 (build 20026.20140)"
+    }
+  ],
+  "sources": [
+    "https://support.microsoft.com/en-au/office/word-for-new-users-cace0fd8-eed9-4aa2-b3c6-07d39895886c",
+    "https://support.microsoft.com/en-us/word/training/create-a-document-in-word",
+    "https://support.microsoft.com/en-us/office/the-new-look-of-office-a6cdf19a-b2bd-4be1-9515-d74a37aa59bf",
+    "https://learn.microsoft.com/en-us/officeupdates/update-history-microsoft365-apps-by-date",
+    "https://support.microsoft.com/en-gb/topic/the-copilot-dynamic-action-button-in-word-excel-and-powerpoint-40db4cef-3d59-474d-9dec-f649b5bfab8e",
+    "https://support.microsoft.com/en-us/office/what-s-the-difference-between-microsoft-365-and-office-2021-ed447ebf-6060-46f9-9e90-a239bd27eb96",
+    "https://support.microsoft.com/en-us/office/change-margins-da21a474-99d8-4e54-b12d-a8a14ea7ce02",
+    "https://support.microsoft.com/en-us/office/add-page-numbers-to-a-header-or-footer-in-word-46d6dfe5-f99b-40d8-8809-be4808a291f4",
+    "https://support.office.com/en-us/article/insert-page-numbers-9f366518-0500-4b45-903d-987d3827c007",
+    "https://blog.nobledesktop.com/learn/microsoft-word/exploring-different-document-views-in-microsoft-word",
+    "https://www.techrepublic.com/article/how-to-work-with-different-views-in-microsoft-word/",
+    "https://www.excelatwork.co.nz/2026/03/29/how-to-add-page-numbers-in-word-starting-on-a-specific-page/",
+    "https://thelinuxcode.com/how-to-insert-a-header-and-footer-in-microsoft-word-practical-section-safe-and-hard-to-break/",
+    "https://support.microsoft.com/en-us/office/insert-a-table-of-contents-882e8564-0edb-435e-84b5-1d8552ccf0c0",
+    "https://support.office.com/en-us/article/Update-a-table-of-contents-6c727329-d8fd-44fe-83b7-fa7fe3d8ac7a",
+    "https://support.microsoft.com/en-us/word/add-or-change-sources-citations-and-bibliographies",
+    "https://support.microsoft.com/en-us/office/create-a-bibliography-citations-and-references-17686589-4824-4940-9c69-342c289fa2a5",
+    "https://support.office.com/en-US/article/Track-changes-in-Word-197ba630-0f5f-4a8e-9a77-3712475e806a",
+    "https://support.microsoft.com/en-us/office/compare-and-merge-two-versions-of-a-document-f5059749-a797-4db7-a8fb-b3b27eb8b87e",
+    "https://support.microsoft.com/en-us/office/combine-document-revisions-f8f07f09-4461-4376-b041-89ad67412cfe",
+    "https://support.microsoft.com/en-us/office/give-and-receive-feedback-in-word-07f25746-7b26-4769-9ebb-ca2f0f5783b8"
+  ]
+}

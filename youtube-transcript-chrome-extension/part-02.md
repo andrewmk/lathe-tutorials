@@ -1,0 +1,1235 @@
+# YouTube Transcript Viewer — Part 2: Language, Search, Copy & Settings
+
+You built a working transcript viewer in Part 1. It fetches captions, displays them with timestamps, and lets you click a line to jump to that moment. But it's doing everything with a single hardcoded language (English-first fallback), no way to search through hundreds of lines, and no memory of your preferences.
+
+This part adds the four features that turn a toy into something you'll actually use:
+
+- **Language selection** — a dropdown that lists every available caption track for the video.
+- **Search** — a text box that filters transcript lines as you type, highlighting matches.
+- **Copy transcript** — one click to copy the full text to your clipboard.
+- **Persistent settings** — your language and search preferences survive a browser restart, stored via `chrome.storage.local`.
+
+By the end of this part, the extension panel will look like this:
+
+```
+┌──────────────────────────────────────┐
+│ 📝 Transcript              [🌐 en] [📋] [✕] │
+├──────────────────────────────────────┤
+│ 🔍 Search...                         │
+├──────────────────────────────────────┤
+│ 0:00  Welcome to today's lecture     │
+│ 0:12  Let's start with the basics    │
+│ 0:28  Now let's look at the code     │ ← highlighted
+│ 0:45  As you can see here...         │
+│ ...                                 │
+└──────────────────────────────────────┘
+```
+
+## Prerequisites
+
+This part builds directly on Part 1. You should have the working extension from Part 01 already loaded in Chrome. If not, go back and follow those steps first.
+
+> [!RECALL]
+> What were the two API calls in Part 1's transcript fetch flow?
+
+*(Answer: 1) POST to `/youtubei/v1/player` to get caption track URLs, 2) GET the caption track URL with `&fmt=json3` to get the actual transcript events.)*
+
+## Adding language selection
+
+In Part 1, we silently preferred English and fell back to the first available track. That's fine for a quick look, but a real transcript viewer should let you choose.
+
+### The message protocol
+
+We need to extend our content script ↔ background script communication. Right now, the content script sends `{ action: "getTranscript", videoId: "..." }` and gets back `{ transcript: [...] }`. We need two new messages:
+
+1. **`getCaptionTracks`** — returns the list of available caption tracks.
+2. **`getTranscript`** — now takes an extra `languageCode` parameter.
+
+Let's start by adding the new background handler:
+
+```javascript
+// background.js — add this to the existing onMessage listener
+
+let cachedTracks = {}; // videoId → captionTracks array
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "getTranscript") {
+    const lang = message.languageCode || "en";
+    fetchTranscriptFromApi(message.videoId, lang).then((transcript) => {
+      sendResponse({ transcript: transcript });
+    });
+    return true;
+  }
+
+  if (message.action === "getCaptionTracks") {
+    // Fetch and cache the caption tracks for this video
+    fetchCaptionTracks(message.videoId).then((tracks) => {
+      cachedTracks[message.videoId] = tracks;
+      sendResponse({ tracks: tracks });
+    });
+    return true;
+  }
+
+  if (message.action === "setLanguage") {
+    // Save language preference for this video
+    chrome.storage.local.set({
+      [`lang_${message.videoId}`]: message.languageCode
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+});
+```
+
+We added three new message types:
+
+- **`getCaptionTracks`** — fetches the list of available caption tracks and caches them (so we don't re-fetch every time you open the panel).
+- **`getTranscript`** — now accepts an optional `languageCode`. If not provided, it defaults to `"en"`.
+- **`setLanguage`** — saves the user's language choice to `chrome.storage.local` with a key like `lang_dQw4w9WgXcQ`.
+
+### Fetching caption tracks
+
+Here's the `fetchCaptionTracks` function. It's almost identical to `getCaptionTracks` from Part 1, but we return the full track objects instead of just the first one:
+
+```javascript
+async function fetchCaptionTracks(videoId) {
+  try {
+    const response = await fetch(
+      "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20250626.01.00",
+            },
+          },
+          videoId: videoId,
+        }),
+      }
+    );
+
+    const data = await response.json();
+    const tracks =
+      data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!tracks || tracks.length === 0) {
+      return [];
+    }
+
+    // Clean up track names for display
+    return tracks.map((track) => ({
+      languageCode: track.languageCode,
+      name: track.name?.simpleText || track.languageCode,
+      isAutoGenerated: track.kind === "asr",
+      baseUrl: track.baseUrl,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch caption tracks:", error);
+    return [];
+  }
+}
+```
+
+Each track object now has:
+
+- **`languageCode`** — e.g., `"en"`, `"es"`, `"fr"`.
+- **`name`** — the display name, like `"English"` or `"English (auto-generated)"`.
+- **`isAutoGenerated`** — `true` if it's an auto-generated caption (the API marks these with `kind: "asr"`).
+- **`baseUrl`** — the URL to fetch the transcript data from.
+
+### The language dropdown
+
+Now let's add a dropdown to the panel. We'll put it in the header, next to the title:
+
+```javascript
+function showTranscriptPanel() {
+  hideTranscriptPanel();
+
+  const panel = document.createElement("div");
+  panel.id = "yt-transcript-panel";
+  panel.innerHTML = `
+    <div class="panel-header">
+      <span>📝 Transcript</span>
+      <div class="header-actions">
+        <select id="lang-select" title="Caption language">
+          <option value="">Loading...</option>
+        </select>
+        <button id="copy-btn" title="Copy transcript">📋</button>
+        <button class="close-btn" id="yt-transcript-close">✕</button>
+      </div>
+    </div>
+    <div class="panel-content">
+      <div class="search-bar">
+        <input type="text" id="transcript-search" placeholder="🔍 Search transcript..." />
+      </div>
+      <div class="transcript-body">
+        <div class="loading">Loading transcript...</div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+
+  // Close button
+  document.getElementById("yt-transcript-close").addEventListener("click", () => {
+    panel.remove();
+    panelOpen = false;
+  });
+
+  // Load caption tracks
+  chrome.runtime.sendMessage(
+    { action: "getCaptionTracks", videoId: currentVideoId },
+    (response) => {
+      const select = panel.querySelector("#lang-select");
+      select.innerHTML = "";
+
+      if (!response || !response.tracks || response.tracks.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No captions available";
+        opt.disabled = true;
+        opt.selected = true;
+        select.appendChild(opt);
+        return;
+      }
+
+      // Check for saved language preference
+      chrome.storage.local.get([`lang_${currentVideoId}`], (items) => {
+        const savedLang = items[`lang_${currentVideoId}`];
+
+        response.tracks.forEach((track) => {
+          const opt = document.createElement("option");
+          opt.value = track.languageCode;
+          opt.textContent = track.isAutoGenerated
+            ? `${track.name} (auto)`
+            : track.name;
+          opt.selected = track.languageCode === savedLang;
+          select.appendChild(opt);
+        });
+
+        // If no saved preference, default to first non-auto track, or first track
+        if (!savedLang && select.value === "") {
+          const firstNonAuto = response.tracks.find((t) => !t.isAutoGenerated);
+          select.value = firstNonAuto?.languageCode || response.tracks[0].languageCode;
+        }
+      });
+
+      // Language change handler
+      select.addEventListener("change", (e) => {
+        const lang = e.target.value;
+        if (lang) {
+          fetchTranscriptForLang(lang, currentVideoId, panel);
+          chrome.runtime.sendMessage({
+            action: "setLanguage",
+            videoId: currentVideoId,
+            languageCode: lang
+          });
+        }
+      });
+    }
+  );
+
+  // Load transcript (uses selected language)
+  const initialLang = panel.querySelector("#lang-select").value;
+  if (initialLang) {
+    fetchTranscriptForLang(initialLang, currentVideoId, panel);
+  }
+
+  // Search handler
+  panel.querySelector("#transcript-search").addEventListener("input", (e) => {
+    filterTranscript(e.target.value);
+  });
+
+  // Copy handler
+  panel.querySelector("#copy-btn").addEventListener("click", () => {
+    copyTranscript(panel);
+  });
+}
+```
+
+> [!ASIDE]
+> Why `chrome.storage.local.get([key])` with an array instead of `chrome.storage.local.get(key)`? The array form is the modern API — it always returns an object mapping keys to values, which is more consistent. The single-key form is legacy behavior that still works but returns just the value directly.
+
+### Fetching transcript for a specific language
+
+We extract the transcript fetching into its own function so both the initial load and the language change can call it:
+
+```javascript
+function fetchTranscriptForLang(languageCode, videoId, panel) {
+  const body = panel.querySelector(".transcript-body");
+  body.innerHTML = '<div class="loading">Loading transcript...</div>';
+
+  chrome.runtime.sendMessage(
+    { action: "getTranscript", videoId: videoId, languageCode: languageCode },
+    (response) => {
+      body.innerHTML = "";
+
+      if (!response || !response.transcript || response.transcript.length === 0) {
+        body.innerHTML = "<p>No transcript available for this language.</p>";
+        return;
+      }
+
+      response.transcript.forEach((segment) => {
+        const line = document.createElement("div");
+        line.className = "transcript-line";
+        line.dataset.start = segment.start;
+        line.innerHTML = `
+          <span class="timestamp">${formatTime(segment.start)}</span>
+          <span class="text">${escapeHtml(segment.text)}</span>
+        `;
+        line.addEventListener("click", () => {
+          seekToTime(segment.start);
+          panelOpen = false;
+          panel.remove();
+        });
+        body.appendChild(line);
+      });
+    }
+  );
+}
+```
+
+Note the small change: when you click a transcript line, we now **close the panel** after seeking. This is a UX improvement — you were probably looking for a specific moment, not browsing the whole transcript.
+
+### Updating the background script
+
+The full updated `background.js`:
+
+```javascript
+// background.js
+
+let cachedTracks = {}; // videoId → captionTracks array
+
+async function fetchCaptionTracks(videoId) {
+  try {
+    const response = await fetch(
+      "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20250626.01.00",
+            },
+          },
+          videoId: videoId,
+        }),
+      }
+    );
+
+    const data = await response.json();
+    const tracks =
+      data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!tracks || tracks.length === 0) {
+      return [];
+    }
+
+    return tracks.map((track) => ({
+      languageCode: track.languageCode,
+      name: track.name?.simpleText || track.languageCode,
+      isAutoGenerated: track.kind === "asr",
+      baseUrl: track.baseUrl,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch caption tracks:", error);
+    return [];
+  }
+}
+
+async function fetchTranscriptFromApi(videoId, languageCode = "en") {
+  try {
+    // Step 1: Get caption track URLs
+    const playerResponse = await fetch(
+      "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20250626.01.00",
+            },
+          },
+          videoId: videoId,
+        }),
+      }
+    );
+
+    const playerData = await playerResponse.json();
+    const captionTracks =
+      playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!captionTracks || captionTracks.length === 0) {
+      return [];
+    }
+
+    // Find the matching language track
+    const track = captionTracks.find((t) =>
+      t.languageCode.startsWith(languageCode)
+    );
+
+    if (!track) {
+      return [];
+    }
+
+    // Step 2: Fetch the transcript
+    const transcriptUrl = track.baseUrl + "&fmt=json3";
+    const transcriptResponse = await fetch(transcriptUrl);
+    const transcriptData = await transcriptResponse.json();
+
+    const events = transcriptData?.events || [];
+    const segments = [];
+
+    for (const event of events) {
+      if (!event.segs) continue;
+
+      const text = event.segs
+        .map((seg) => seg.utf8 || "")
+        .join("")
+        .trim();
+
+      if (text) {
+        segments.push({
+          text: text,
+          start: event.tStartMs / 1000,
+          duration: event.dDurationMs / 1000,
+        });
+      }
+    }
+
+    return segments;
+  } catch (error) {
+    console.error("Transcript fetch error:", error);
+    return [];
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "getTranscript") {
+    const lang = message.languageCode || "en";
+    fetchTranscriptFromApi(message.videoId, lang).then((transcript) => {
+      sendResponse({ transcript: transcript });
+    });
+    return true;
+  }
+
+  if (message.action === "getCaptionTracks") {
+    fetchCaptionTracks(message.videoId).then((tracks) => {
+      cachedTracks[message.videoId] = tracks;
+      sendResponse({ tracks: tracks });
+    });
+    return true;
+  }
+
+  if (message.action === "setLanguage") {
+    chrome.storage.local.set({
+      [`lang_${message.videoId}`]: message.languageCode
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+});
+```
+
+### Updating the CSS
+
+We need styles for the new UI elements:
+
+```css
+/* Add to content.js */
+
+#yt-transcript-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #303030;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+#yt-transcript-panel .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#yt-transcript-panel #lang-select {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#yt-transcript-panel #lang-select:hover {
+  border-color: #606060;
+}
+
+#yt-transcript-panel .close-btn,
+#yt-transcript-panel #copy-btn {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+#yt-transcript-panel .close-btn:hover,
+#yt-transcript-panel #copy-btn:hover {
+  color: #fff;
+  background: #333;
+}
+
+#yt-transcript-panel .search-bar {
+  padding: 12px 16px;
+  background: #141414;
+  border-bottom: 1px solid #303030;
+}
+
+#yt-transcript-panel #transcript-search {
+  width: 100%;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+#yt-transcript-panel #transcript-search:focus {
+  border-color: #3ea6ff;
+}
+
+#yt-transcript-panel .search-bar input::placeholder {
+  color: #666;
+}
+
+#yt-transcript-panel .transcript-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+#yt-transcript-panel .transcript-line {
+  padding: 10px 16px;
+  border-bottom: 1px solid #1a1a1a;
+  cursor: pointer;
+  transition: background 0.15s;
+  line-height: 1.5;
+}
+
+#yt-transcript-panel .transcript-line:hover {
+  background: #1a1a1a;
+}
+
+#yt-transcript-panel .transcript-line.active {
+  background: #262626;
+  border-left: 3px solid #3ea6ff;
+}
+
+#yt-transcript-panel .transcript-line.hidden {
+  display: none;
+}
+
+#yt-transcript-panel .timestamp {
+  color: #aaa;
+  margin-right: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+#yt-transcript-panel .text {
+  color: #e0e0e0;
+}
+
+#yt-transcript-panel .text mark {
+  background: #3ea6ff33;
+  color: #3ea6ff;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+```
+
+## Adding search
+
+The search feature filters transcript lines as you type. It's deceptively simple but has one trapdoor: you need to highlight matching text without breaking the timestamp.
+
+### The search filter
+
+```javascript
+function filterTranscript(query) {
+  const lines = document.querySelectorAll("#yt-transcript-panel .transcript-line");
+  const lowerQuery = query.toLowerCase();
+
+  lines.forEach((line) => {
+    const textEl = line.querySelector(".text");
+    const originalText = textEl.textContent;
+
+    if (!query || originalText.toLowerCase().includes(lowerQuery)) {
+      line.classList.remove("hidden");
+      // Restore original text (remove any previous marks)
+      textEl.innerHTML = escapeHtml(originalText);
+    } else {
+      line.classList.add("hidden");
+    }
+  });
+}
+```
+
+> [!HEADS-UP]
+> Don't try to highlight matches with `innerHTML = text.replace(...)` before the initial render — the text is already in the DOM from the transcript fetch. Instead, toggle the `.hidden` class on the line element. For the highlighting effect, we re-render the text with `<mark>` tags only when the search query changes.
+
+### Highlighting matches
+
+When the user types, we want to highlight the matching portions of the text. We do this by wrapping matches in `<mark>` tags:
+
+```javascript
+function filterTranscript(query) {
+  const lines = document.querySelectorAll("#yt-transcript-panel .transcript-line");
+  const lowerQuery = query.toLowerCase();
+
+  lines.forEach((line) => {
+    const textEl = line.querySelector(".text");
+    const originalText = textEl.getAttribute("data-original") || textEl.textContent;
+
+    if (!query) {
+      line.classList.remove("hidden");
+      textEl.innerHTML = escapeHtml(originalText);
+      return;
+    }
+
+    if (originalText.toLowerCase().includes(lowerQuery)) {
+      line.classList.remove("hidden");
+      // Highlight matches
+      const escaped = escapeHtml(originalText);
+      const regex = new RegExp(`(${escapeRegex(query)})`, "gi");
+      textEl.innerHTML = escaped.replace(regex, '<mark>$1</mark>');
+    } else {
+      line.classList.add("hidden");
+    }
+  });
+}
+
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+```
+
+We store the original text in a `data-original` attribute on the text `<span>` during the initial render, so we can always restore it:
+
+```javascript
+// In fetchTranscriptForLang, when creating lines:
+line.innerHTML = `
+  <span class="timestamp">${formatTime(segment.start)}</span>
+  <span class="text" data-original="${escapeHtml(segment.text)}">${escapeHtml(segment.text)}</span>
+`;
+```
+
+> [!ASIDE]
+> Why `escapeRegex`? If the user types `test.js` (with a dot), the dot is a regex wildcard that matches any character. Without escaping, `test.js` would match `testXjs`, `test-js`, etc. `escapeRegex` turns the dot back into a literal dot.
+
+## Adding copy transcript
+
+The copy button grabs all visible transcript lines and copies them to the clipboard as plain text:
+
+```javascript
+function copyTranscript(panel) {
+  const lines = panel.querySelectorAll(".transcript-line:not(.hidden)");
+  const text = Array.from(lines)
+    .map((line) => {
+      const time = line.querySelector(".timestamp").textContent;
+      const text = line.querySelector(".text").getAttribute("data-original");
+      return `[${time}] ${text}`;
+    })
+    .join("\n");
+
+  navigator.clipboard.writeText(text).then(() => {
+    // Show brief "copied!" feedback
+    const copyBtn = panel.querySelector("#copy-btn");
+    const original = copyBtn.textContent;
+    copyBtn.textContent = "✓";
+    copyBtn.style.color = "#4caf50";
+    setTimeout(() => {
+      copyBtn.textContent = original;
+      copyBtn.style.color = "";
+    }, 1500);
+  }).catch((err) => {
+    console.error("Failed to copy:", err);
+  });
+}
+```
+
+This uses the [Clipboard API](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard) — `navigator.clipboard.writeText()`. It's a modern, promise-based API that works in any secure context (HTTPS or `chrome-extension://`).
+
+> [!TIP]
+> The fallback feedback (changing the icon to a checkmark) is a small detail that makes the extension feel polished. Users need confirmation that the copy worked — especially since the clipboard operation is invisible.
+
+## Persistent settings with chrome.storage
+
+In Part 1, we loaded the extension fresh every time. Now we want to remember:
+
+- Which language you picked for each video.
+- Whether you had the panel open when you closed the tab (optional bonus).
+
+### Saving preferences
+
+We already added the `setLanguage` message handler. But we can also save the panel state:
+
+```javascript
+// In content.js, when the panel closes
+document.getElementById("yt-transcript-close").addEventListener("click", () => {
+  panel.remove();
+
+  // Save panel state
+  chrome.storage.local.set({
+    [`panelOpen_${currentVideoId}`]: false
+  });
+
+  panelOpen = false;
+});
+```
+
+### Loading preferences on panel open
+
+When the user opens the panel, we check if they had it open before:
+
+```javascript
+function showTranscriptPanel() {
+  hideTranscriptPanel();
+
+  // Check if panel was open for this video
+  chrome.storage.local.get([`panelOpen_${currentVideoId}`], (items) => {
+    const wasOpen = items[`panelOpen_${currentVideoId}`];
+    if (!wasOpen) {
+      // Don't auto-open, just show normally
+    }
+  });
+
+  // ... rest of showTranscriptPanel
+}
+```
+
+### The chrome.storage API
+
+`chrome.storage.local` is Chrome's key-value store for extensions. It's:
+
+- **Asynchronous** — all methods return promises (or use callbacks).
+- **Persistent** — data survives browser restarts.
+- **Limited** — ~100MB per extension (way more than you'll need).
+- **Scoped** — each extension has its own storage; you can't read another extension's data.
+
+The two main methods you'll use:
+
+```javascript
+// Save: pass an object of key → value pairs
+chrome.storage.local.set({ key: "value" });
+
+// Read: pass a key (string) or array of keys
+chrome.storage.local.get(["key"], (result) => {
+  console.log(result.key); // "value"
+});
+```
+
+> [!ASIDE]
+> `chrome.storage.local` is the modern replacement for `chrome.storage.sync` (which synced settings across devices via Google account). The sync API has a 100KB limit and is slower; local storage is faster and has a much higher limit. For a personal extension like this, local is the right choice.
+
+## The complete updated files
+
+### Full `background.js`
+
+```javascript
+// background.js
+
+let cachedTracks = {}; // videoId → captionTracks array
+
+async function fetchCaptionTracks(videoId) {
+  try {
+    const response = await fetch(
+      "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20250626.01.00",
+            },
+          },
+          videoId: videoId,
+        }),
+      }
+    );
+
+    const data = await response.json();
+    const tracks =
+      data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!tracks || tracks.length === 0) {
+      return [];
+    }
+
+    return tracks.map((track) => ({
+      languageCode: track.languageCode,
+      name: track.name?.simpleText || track.languageCode,
+      isAutoGenerated: track.kind === "asr",
+      baseUrl: track.baseUrl,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch caption tracks:", error);
+    return [];
+  }
+}
+
+async function fetchTranscriptFromApi(videoId, languageCode = "en") {
+  try {
+    const playerResponse = await fetch(
+      "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20250626.01.00",
+            },
+          },
+          videoId: videoId,
+        }),
+      }
+    );
+
+    const playerData = await playerResponse.json();
+    const captionTracks =
+      playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!captionTracks || captionTracks.length === 0) {
+      return [];
+    }
+
+    const track = captionTracks.find((t) =>
+      t.languageCode.startsWith(languageCode)
+    );
+
+    if (!track) {
+      return [];
+    }
+
+    const transcriptUrl = track.baseUrl + "&fmt=json3";
+    const transcriptResponse = await fetch(transcriptUrl);
+    const transcriptData = await transcriptResponse.json();
+
+    const events = transcriptData?.events || [];
+    const segments = [];
+
+    for (const event of events) {
+      if (!event.segs) continue;
+
+      const text = event.segs
+        .map((seg) => seg.utf8 || "")
+        .join("")
+        .trim();
+
+      if (text) {
+        segments.push({
+          text: text,
+          start: event.tStartMs / 1000,
+          duration: event.dDurationMs / 1000,
+        });
+      }
+    }
+
+    return segments;
+  } catch (error) {
+    console.error("Transcript fetch error:", error);
+    return [];
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "getTranscript") {
+    const lang = message.languageCode || "en";
+    fetchTranscriptFromApi(message.videoId, lang).then((transcript) => {
+      sendResponse({ transcript: transcript });
+    });
+    return true;
+  }
+
+  if (message.action === "getCaptionTracks") {
+    fetchCaptionTracks(message.videoId).then((tracks) => {
+      cachedTracks[message.videoId] = tracks;
+      sendResponse({ tracks: tracks });
+    });
+    return true;
+  }
+
+  if (message.action === "setLanguage") {
+    chrome.storage.local.set({
+      [`lang_${message.videoId}`]: message.languageCode
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+});
+```
+
+### Full `content.js`
+
+```javascript
+// content.js
+
+// --- Helpers ---
+
+function getVideoId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("v");
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function seekToTime(seconds) {
+  const player = document.querySelector("video");
+  if (player) {
+    player.currentTime = seconds;
+    player.play();
+  }
+}
+
+// --- Panel management ---
+
+let panelOpen = false;
+let currentVideoId = getVideoId();
+
+function toggleTranscriptPanel() {
+  panelOpen = !panelOpen;
+  if (panelOpen) {
+    showTranscriptPanel();
+  } else {
+    hideTranscriptPanel();
+  }
+}
+
+function showTranscriptPanel() {
+  hideTranscriptPanel();
+
+  const panel = document.createElement("div");
+  panel.id = "yt-transcript-panel";
+  panel.innerHTML = `
+    <div class="panel-header">
+      <span>📝 Transcript</span>
+      <div class="header-actions">
+        <select id="lang-select" title="Caption language">
+          <option value="">Loading...</option>
+        </select>
+        <button id="copy-btn" title="Copy transcript">📋</button>
+        <button class="close-btn" id="yt-transcript-close">✕</button>
+      </div>
+    </div>
+    <div class="panel-content">
+      <div class="search-bar">
+        <input type="text" id="transcript-search" placeholder="🔍 Search transcript..." />
+      </div>
+      <div class="transcript-body">
+        <div class="loading">Loading transcript...</div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+
+  // Close button
+  document.getElementById("yt-transcript-close").addEventListener("click", () => {
+    panel.remove();
+    panelOpen = false;
+
+    chrome.storage.local.set({
+      [`panelOpen_${currentVideoId}`]: false
+    });
+  });
+
+  // Load caption tracks
+  chrome.runtime.sendMessage(
+    { action: "getCaptionTracks", videoId: currentVideoId },
+    (response) => {
+      const select = panel.querySelector("#lang-select");
+      select.innerHTML = "";
+
+      if (!response || !response.tracks || response.tracks.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No captions available";
+        opt.disabled = true;
+        opt.selected = true;
+        select.appendChild(opt);
+        return;
+      }
+
+      // Check for saved language preference
+      chrome.storage.local.get([`lang_${currentVideoId}`], (items) => {
+        const savedLang = items[`lang_${currentVideoId}`];
+
+        response.tracks.forEach((track) => {
+          const opt = document.createElement("option");
+          opt.value = track.languageCode;
+          opt.textContent = track.isAutoGenerated
+            ? `${track.name} (auto)`
+            : track.name;
+          opt.selected = track.languageCode === savedLang;
+          select.appendChild(opt);
+        });
+
+        // Default to first non-auto track, or first track
+        if (select.value === "") {
+          const firstNonAuto = response.tracks.find((t) => !t.isAutoGenerated);
+          select.value = firstNonAuto?.languageCode || response.tracks[0].languageCode;
+        }
+      });
+
+      select.addEventListener("change", (e) => {
+        const lang = e.target.value;
+        if (lang) {
+          fetchTranscriptForLang(lang, currentVideoId, panel);
+          chrome.runtime.sendMessage({
+            action: "setLanguage",
+            videoId: currentVideoId,
+            languageCode: lang
+          });
+        }
+      });
+    }
+  );
+
+  // Load initial transcript
+  const initialLang = panel.querySelector("#lang-select").value;
+  if (initialLang) {
+    fetchTranscriptForLang(initialLang, currentVideoId, panel);
+  }
+
+  // Search
+  panel.querySelector("#transcript-search").addEventListener("input", (e) => {
+    filterTranscript(e.target.value);
+  });
+
+  // Copy
+  panel.querySelector("#copy-btn").addEventListener("click", () => {
+    copyTranscript(panel);
+  });
+}
+
+function hideTranscriptPanel() {
+  const existing = document.getElementById("yt-transcript-panel");
+  if (existing) existing.remove();
+}
+
+function fetchTranscriptForLang(languageCode, videoId, panel) {
+  const body = panel.querySelector(".transcript-body");
+  body.innerHTML = '<div class="loading">Loading transcript...</div>';
+
+  chrome.runtime.sendMessage(
+    { action: "getTranscript", videoId: videoId, languageCode: languageCode },
+    (response) => {
+      body.innerHTML = "";
+
+      if (!response || !response.transcript || response.transcript.length === 0) {
+        body.innerHTML = "<p>No transcript available for this language.</p>";
+        return;
+      }
+
+      response.transcript.forEach((segment) => {
+        const line = document.createElement("div");
+        line.className = "transcript-line";
+        line.dataset.start = segment.start;
+        line.innerHTML = `
+          <span class="timestamp">${formatTime(segment.start)}</span>
+          <span class="text" data-original="${escapeHtml(segment.text)}">${escapeHtml(segment.text)}</span>
+        `;
+        line.addEventListener("click", () => {
+          seekToTime(segment.start);
+          panelOpen = false;
+          panel.remove();
+        });
+        body.appendChild(line);
+      });
+    }
+  );
+}
+
+function filterTranscript(query) {
+  const lines = document.querySelectorAll("#yt-transcript-panel .transcript-line");
+  const lowerQuery = query.toLowerCase();
+
+  lines.forEach((line) => {
+    const textEl = line.querySelector(".text");
+    const originalText = textEl.getAttribute("data-original") || textEl.textContent;
+
+    if (!query) {
+      line.classList.remove("hidden");
+      textEl.innerHTML = escapeHtml(originalText);
+      return;
+    }
+
+    if (originalText.toLowerCase().includes(lowerQuery)) {
+      line.classList.remove("hidden");
+      const escaped = escapeHtml(originalText);
+      const regex = new RegExp(`(${escapeRegex(query)})`, "gi");
+      textEl.innerHTML = escaped.replace(regex, '<mark>$1</mark>');
+    } else {
+      line.classList.add("hidden");
+    }
+  });
+}
+
+function copyTranscript(panel) {
+  const lines = panel.querySelectorAll(".transcript-line:not(.hidden)");
+  const text = Array.from(lines)
+    .map((line) => {
+      const time = line.querySelector(".timestamp").textContent;
+      const text = line.querySelector(".text").getAttribute("data-original");
+      return `[${time}] ${text}`;
+    })
+    .join("\n");
+
+  navigator.clipboard.writeText(text).then(() => {
+    const copyBtn = panel.querySelector("#copy-btn");
+    const original = copyBtn.textContent;
+    copyBtn.textContent = "✓";
+    copyBtn.style.color = "#4caf50";
+    setTimeout(() => {
+      copyBtn.textContent = original;
+      copyBtn.style.color = "";
+    }, 1500);
+  }).catch((err) => {
+    console.error("Failed to copy:", err);
+  });
+}
+
+// --- Button injection ---
+
+function addTranscriptButton() {
+  const sidebar = document.querySelector("#sidebar #secondary");
+  if (!sidebar) return;
+  if (document.querySelector("#yt-transcript-btn")) return;
+
+  const button = document.createElement("yt-button");
+  button.id = "yt-transcript-btn";
+  button.style.marginTop = "12px";
+  button.innerHTML = `
+    <span slot="icon">📝</span>
+    Transcript
+  `;
+
+  button.addEventListener("click", toggleTranscriptPanel);
+  sidebar.prepend(button);
+}
+
+// --- URL change detection ---
+
+function onVideoChanged() {
+  if (panelOpen) {
+    showTranscriptPanel();
+  }
+}
+
+function watchForUrlChanges() {
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (
+        mutation.type === "attributes" &&
+        mutation.attributeName === "href"
+      ) {
+        const newVideoId = getVideoId();
+        if (newVideoId && newVideoId !== currentVideoId) {
+          currentVideoId = newVideoId;
+          onVideoChanged();
+        }
+      }
+    }
+  });
+
+  observer.observe(document.querySelector("ytd-app"), {
+    attributes: true,
+    subtree: true,
+  });
+}
+
+// --- Init ---
+
+addTranscriptButton();
+watchForUrlChanges();
+```
+
+## Checkpoint
+
+> [!PREDICT]
+> Before you test: what happens if you switch languages while the panel is open?
+
+**Run this to verify your work so far:**
+
+1. Reload the extension in `chrome://extensions/` (click the reload icon).
+2. Open a YouTube video.
+3. Click the Transcript button.
+4. Use the language dropdown to switch between available caption languages.
+5. Type in the search box — matching lines should highlight, non-matching lines should hide.
+6. Click the copy button — paste into a text editor to verify the clipboard content.
+7. Close the panel, navigate to a different video, open the panel again — the language should default to English (or your saved preference).
+
+**Likely errors:**
+
+- **Dropdown is empty** — the video has no captions. Try a different video.
+- **Search doesn't highlight** — check the DevTools console for regex errors. Make sure `escapeRegex` is defined.
+- **Copy button does nothing** — you might need to click the button first (browsers require a user gesture for clipboard access).
+
+## What's next
+
+You now have a fully functional transcript viewer with language selection, search, copy, and persistent settings. Part 3 will add:
+
+- **Active line highlighting** — the transcript highlights the line corresponding to the current video position, auto-scrolling to keep it in view.
+- **Keyboard shortcuts** — `Ctrl+Shift+T` to toggle the panel, `/` to focus search.
+- **Export as SRT** — download the transcript as a proper SubRip subtitle file.
+- **A popup UI** — a small popup (click the extension icon) that shows quick stats about the current video.
+
+## Exercises
+
+- [ ] **Auto-scroll to active line.** Add a `setInterval` that polls `video.currentTime` every 500ms and highlights the matching transcript line. Hint: compare `video.currentTime` to each segment's `start` value and add/remove the `.active` class.
+- [ ] **Debounced search.** Right now, `filterTranscript` runs on every keystroke. Add a 200ms debounce so it only runs after the user stops typing. Hint: use `setTimeout`/`clearTimeout` with a closure.
+- [ ] **SRT export.** Add a button that downloads the transcript as an `.srt` file. The SRT format is: line number, time range (`00:00:01,000 --> 00:00:04,000`), then the text. Hint: use `URL.createObjectURL` with a `Blob` to create a downloadable link.
+- [ ] **Keyboard shortcut.** Add `Ctrl+Shift+T` to toggle the transcript panel. Hint: add `"commands": { "toggle-transcript": { "suggested_key": { "default": "Ctrl+Shift+T" } } }` to the manifest, then listen for `chrome.runtime.onCommand`.
+
+## Sources
+
+1. [Chrome Extensions — Storage](https://developer.chrome.com/docs/extensions/reference/storage) — the `chrome.storage` API docs, including `local` vs `sync` differences.
+2. [Clipboard API — navigator.clipboard](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard) — the modern clipboard API for reading/writing clipboard data.
+3. [InnerTube API — captionTracks response](https://github.com/nadimtuhin/ytranscript/blob/main/HOW_IT_WORKS.md) — the structure of caption track objects returned by the InnerTube player endpoint.
+4. [SRT Subtitle Format](https://www.media.mit.edu/pia/Research/deepview/srtool/srt_subtitles.html) — the SubRip text format specification, used for exporting subtitle files.
+5. [Right Side Comments — content.js](https://github.com/la5u/right-side-comments/blob/main/content.js) — demonstrates the `MutationObserver` pattern for detecting SPA navigation in YouTube, used in this part for video change detection.
